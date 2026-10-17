@@ -71,10 +71,15 @@ export default function ControlRoom() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"initial" | "post_action" | "flow" | "warped">("post_action");
   const [apiHost, setApiHost] = useState(
-    process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"
+    process.env.NEXT_PUBLIC_API_URL || ""
   );
   const [customFloodNetId, setCustomFloodNetId] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const getApiEndpoint = (path: string) => {
+    if (!apiHost) return path;
+    return `${apiHost.replace(/\/$/, "")}${path}`;
+  };
 
   // Trigger inspection from file upload
   const runInspection = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -84,7 +89,7 @@ export default function ControlRoom() {
     const formData = new FormData(e.currentTarget);
 
     try {
-      const endpoint = `${apiHost.replace(/\/$/, "")}/inspect`;
+      const endpoint = getApiEndpoint("/inspect");
       const res = await fetch(endpoint, {
         method: "POST",
         body: formData,
@@ -100,7 +105,7 @@ export default function ControlRoom() {
       const isNetworkErr = err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("Network"));
       setErrorMsg(
         isNetworkErr
-          ? `Backend offline: Cannot connect to ${apiHost}. Please run the backend in a separate terminal: .\\.venv\\Scripts\\uvicorn backend.app.main:app --port 8000`
+          ? `Backend offline: Cannot connect to ${apiHost || "API server"}. Please ensure the backend is running (port 8000).`
           : err instanceof Error ? err.message : "Failed to run inspection"
       );
     } finally {
@@ -113,7 +118,7 @@ export default function ControlRoom() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const endpoint = `${apiHost.replace(/\/$/, "")}/api/scenarios/${scenarioId}/run`;
+      const endpoint = getApiEndpoint(`/api/scenarios/${scenarioId}/run`);
       const res = await fetch(endpoint, { method: "POST" });
       if (!res.ok) {
         throw new Error(`Scenario call returned ${res.status}: ${await res.text()}`);
@@ -126,7 +131,7 @@ export default function ControlRoom() {
       const isNetworkErr = err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("Network"));
       setErrorMsg(
         isNetworkErr
-          ? `Backend offline: Cannot connect to ${apiHost}. Please run the backend in a separate terminal: .\\.venv\\Scripts\\uvicorn backend.app.main:app --port 8000`
+          ? `Backend offline: Cannot connect to ${apiHost || "API server"}. Please ensure the backend is running (port 8000).`
           : err instanceof Error ? err.message : "Failed to run scenario"
       );
     } finally {
@@ -141,7 +146,7 @@ export default function ControlRoom() {
     setErrorMsg(null);
     try {
       const cleanId = sampleId.replace(/\.jpg$/i, "").trim();
-      const endpoint = `${apiHost.replace(/\/$/, "")}/api/floodnet/inspect/${cleanId}`;
+      const endpoint = getApiEndpoint(`/api/floodnet/inspect/${cleanId}`);
       const res = await fetch(endpoint, { method: "POST" });
       if (!res.ok) {
         throw new Error(`FloodNet call returned ${res.status}: ${await res.text()}`);
@@ -154,7 +159,7 @@ export default function ControlRoom() {
       const isNetworkErr = err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("Network"));
       setErrorMsg(
         isNetworkErr
-          ? `Backend offline: Cannot connect to ${apiHost}. Please run the backend in a separate terminal: .\\.venv\\Scripts\\uvicorn backend.app.main:app --port 8000`
+          ? `Backend offline: Cannot connect to ${apiHost || "API server"}. Please ensure the backend is running (port 8000).`
           : err instanceof Error ? err.message : `Failed to load FloodNet ID: ${sampleId}`
       );
     } finally {
@@ -217,7 +222,7 @@ export default function ControlRoom() {
               value={apiHost}
               onChange={(e) => setApiHost(e.target.value)}
               className="bg-transparent text-neutral-200 outline-none w-44 font-mono"
-              placeholder="http://127.0.0.1:8000"
+              placeholder="/ (auto-proxy)"
             />
           </div>
 

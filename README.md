@@ -249,29 +249,77 @@ $env:NVIDIA_API_KEY="mock-key"
 ```
 *Validates 11 test cases across the CV engine, CLAHE, homography, optical flow, FSM branches, and AWS local persistence.*
 
-### Run the 100-Frame COOL Benchmark
+## 🧪 Automated Testing & COOL Benchmark
+
+### Run the Pytest Suite
 ```powershell
-python backend/benchmark_cool.py --iterations 100 --output cool_benchmark_results.csv
+$env:NVIDIA_API_KEY="mock-key"
+.\.venv\Scripts\pytest -v
+```
+*Validates 11 test cases across the CV engine, CLAHE, homography, optical flow, FSM branches, and AWS persistence.*
+
+### Run the 500-Iteration COOL Benchmark
+```powershell
+python backend/benchmark_cool.py --iterations 500 --output cool_benchmark_results.csv
 ```
 *Measures full 1080p frame compute latency and FPS throughput, generating [`cool_benchmark_results.csv`](file:///c:/Coding%20Stuff/SwarmTwin/cool_benchmark_results.csv).*
 
 ---
 
-## 🚀 AWS Graviton4 Deployment
+## 🚀 AWS Graviton4 Production Deployment
 
-Deploy on an **AWS Graviton4 (`c8g.large`)** instance using the official Ubuntu Cloud-Optimized OpenCV Library (COOL) AMI:
+SwarmTwin is designed for **AWS Graviton4 (`c8g.large` or `c8g.xlarge`)** instances running the official Ubuntu **Cloud-Optimized OpenCV Library (COOL)** AMI or standard Ubuntu 24.04 LTS (Arm64).
+
+### Option A: Automated Native EC2 Deployment (Recommended)
+
+1. **Launch EC2 Instance:**
+   - **AMI:** Ubuntu 24.04 LTS (Arm64) or the official AWS Marketplace COOL Ubuntu AMI.
+   - **Instance Type:** `c8g.large` (AWS Graviton4) or `c7g.xlarge`.
+   - **Security Group Inbound Rules:**
+     - Port `80` (HTTP) — Web Control Room & API
+     - Port `22` (SSH) — Remote administration
+     - *(Optional)* Port `443` (HTTPS)
+
+2. **Attach IAM Role (No Hardcoded Credentials):**
+   - Create an IAM Role (e.g. `SwarmTwinEC2Role`) using [`deploy/aws-iam-policy.json`](file:///c:/Coding%20Stuff/SwarmTwin/deploy/aws-iam-policy.json) and attach it to your EC2 instance.
+   - When attached, Boto3 automatically retrieves temporary credentials via IMDSv2—no static secret keys in `.env` required!
+
+3. **Provision S3 Bucket & DynamoDB Table:**
+   ```bash
+   chmod +x deploy/aws-setup.sh
+   ./deploy/aws-setup.sh
+   ```
+
+4. **Run the One-Click Deployment Script:**
+   ```bash
+   chmod +x deploy_graviton.sh
+   ./deploy_graviton.sh
+   ```
+   **What `deploy_graviton.sh` executes automatically:**
+   - Detects ARM64 / Graviton and activates `/opt/cool` KleidiCV fused vector kernels.
+   - Installs system runtime dependencies, Node.js 20+, and Nginx.
+   - Installs Python dependencies and executes the automated test suite.
+   - Builds the production Next.js Control Room dashboard.
+   - Runs the mandatory 500-iteration 1080p benchmark for the AWS Graviton COOL Prize.
+   - Installs and starts persistent `systemd` services (`swarmtwin-backend` and `swarmtwin-ui`).
+   - Configures Nginx reverse proxy on port 80 routing `/` to Next.js and `/inspect` + `/api/` to FastAPI.
+
+### Option B: Containerized Deployment (Docker Compose)
+
+For multi-arch containerized deployment on Amazon ECS, EKS, or EC2:
 
 ```bash
-chmod +x deploy_graviton.sh
-./deploy_graviton.sh
+docker compose up -d --build
 ```
-This script checks ARM64 architecture, verifies `/opt/cool` KleidiCV acceleration, runs the 100-frame benchmark, and starts the FastAPI service.
+- **Control Room:** `http://<EC2_PUBLIC_IP>:3000`
+- **Backend API:** `http://<EC2_PUBLIC_IP>:8000`
 
 ---
 
 ## 🔒 Security & Persistence
 - **Zero API Quota Leaks:** Local SQLite caching (`nim_cache.db`) stores responses based on geometric hashes.
-- **Fail-Safe Cloud Persistence:** In offline or local test mode, all evidence frames and JSON audit traces are preserved in [`data/aws_local_store/`](file:///c:/Coding%20Stuff/SwarmTwin/data/aws_local_store). When AWS credentials are supplied, cloud uploads to S3 and DynamoDB activate automatically.
+- **Fail-Safe Cloud Persistence:** In offline or local test mode, all evidence frames and JSON audit traces are preserved in [`data/aws_local_store/`](file:///c:/Coding%20Stuff/SwarmTwin/data/aws_local_store). When AWS credentials or an IAM instance role is detected, cloud uploads to S3 and DynamoDB activate automatically.
+
 
 ---
 

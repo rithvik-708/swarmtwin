@@ -23,8 +23,8 @@ class AWSManager:
         local_fallback_dir: str = "data/aws_local_store"
     ):
         self.region = region_name or os.getenv('AWS_REGION', 'us-east-1')
-        self.bucket = bucket_name or os.getenv('S3_BUCKET_NAME', 'swarmtwin-evidence-frames')
-        self.table_name = table_name or os.getenv('DYNAMO_TABLE_NAME', 'SwarmTwinIncidents')
+        self.bucket = bucket_name or os.getenv('S3_BUCKET_NAME') or os.getenv('S3_BUCKET', 'swarmtwin-evidence-frames')
+        self.table_name = table_name or os.getenv('DYNAMO_TABLE_NAME') or os.getenv('DYNAMODB_TABLE', 'SwarmTwinIncidents')
         self.local_fallback_dir = local_fallback_dir
         os.makedirs(self.local_fallback_dir, exist_ok=True)
 

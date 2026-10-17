@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: swarmtwin-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/app/data
+      - ./nim_cache.db:/app/nim_cache.db
+
+  ui:
+    build:
+      context: ./swarmtwin-ui
+      dockerfile: Dockerfile
+    container_name: swarmtwin-ui
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+
+networks:
+  default:
+    name: swarmtwin-network

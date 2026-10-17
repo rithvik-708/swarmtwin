@@ -1,0 +1,18 @@
+[Unit]
+Description=SwarmTwin FastAPI Agentic Vision Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/swarmtwin
+Environment="PATH=/opt/swarmtwin/.venv/bin:/opt/cool/bin:/usr/local/bin:/usr/bin"
+EnvironmentFile=-/opt/swarmtwin/backend/.env
+ExecStart=/opt/swarmtwin/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

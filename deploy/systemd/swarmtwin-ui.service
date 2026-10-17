@@ -1,0 +1,19 @@
+[Unit]
+Description=SwarmTwin Next.js Control Room Dashboard
+After=network.target swarmtwin-backend.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/swarmtwin/swarmtwin-ui
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="NEXT_PUBLIC_API_URL="
+ExecStart=/usr/bin/npm run start -- -p 3000
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
