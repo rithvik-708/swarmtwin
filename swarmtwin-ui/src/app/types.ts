@@ -44,4 +44,5 @@ export interface InspectionResponse {
   confidence_delta?: number;
   metrics_summary?: Record<string, unknown>;
   visual_evidence?: VisualEvidence;
+  gps?: { lat: number; lng: number };
 }
