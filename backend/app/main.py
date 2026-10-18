@@ -27,6 +27,7 @@ from .floodnet_loader import (
     create_synthetic_alternate_view,
     create_synthetic_temporal_surge
 )
+from .disaster_api import DisasterFeedManager, LiveDisaster
 
 app = FastAPI(
     title="SwarmTwin Agentic Vision API",
@@ -47,6 +48,7 @@ cv_engine = SwarmCVEngine()
 reasoner = NimVisionReasoner()
 agent = SwarmTwinAgent(cv_engine, reasoner)
 aws_manager = AWSManager()
+disaster_manager = DisasterFeedManager()
 
 # Global incident repository (in-memory cache for demo session)
 INCIDENTS_STORE: List[Dict[str, Any]] = []
@@ -150,6 +152,11 @@ async def inspect_incident(
 @app.get("/api/incidents")
 def list_incidents() -> List[Dict[str, Any]]:
     return INCIDENTS_STORE
+
+@app.get("/api/live-disasters", response_model=List[LiveDisaster])
+async def get_live_disasters():
+    """Fetches real-time disaster alerts from ReliefWeb and Copernicus EMS."""
+    return disaster_manager.get_unified_feed()
 
 @app.get("/api/floodnet/samples")
 def get_floodnet_samples() -> List[Dict[str, Any]]:

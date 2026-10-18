@@ -1,8 +1,9 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { useEffect } from "react";
 
 // Fix Leaflet's default icon paths in Next.js
 const icon = L.icon({
@@ -13,10 +14,19 @@ const icon = L.icon({
   iconAnchor: [12, 41],
 });
 
+function MapRecenter({ lat, lng }: { lat: number; lng: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView([lat, lng], map.getZoom());
+  }, [lat, lng, map]);
+  return null;
+}
+
 export default function Map({ lat, lng, hazard }: { lat: number; lng: number; hazard: string }) {
   return (
-    <div className="h-full w-full min-h-[300px] z-0 relative rounded-md overflow-hidden border border-slate-300">
-      <MapContainer center={[lat, lng]} zoom={16} scrollWheelZoom={false} className="h-full w-full">
+    <div className="h-full w-full min-h-[260px] z-0 relative rounded-md overflow-hidden border border-slate-300">
+      <MapContainer center={[lat, lng]} zoom={13} scrollWheelZoom={false} className="h-full w-full">
+        <MapRecenter lat={lat} lng={lng} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

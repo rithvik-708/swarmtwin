@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   Upload,
@@ -16,9 +16,11 @@ import {
   Zap,
   Crosshair,
   ArrowRight,
-  Database
+  Database,
+  Globe,
+  ExternalLink
 } from "lucide-react";
-import type { InspectionResponse } from "./types";
+import type { InspectionResponse, LiveDisaster } from "./types";
 
 // Dynamically import the Leaflet map to prevent Next.js SSR window is not defined errors
 const GISMap = dynamic(() => import("../components/Map"), {
@@ -83,10 +85,39 @@ export default function ControlRoom() {
   const [customFloodNetId, setCustomFloodNetId] = useState("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Live Macro-Level Disaster Feeds (UN ReliefWeb & Copernicus EMS)
+  const [disasters, setDisasters] = useState<LiveDisaster[]>([]);
+  const [loadingDisasters, setLoadingDisasters] = useState(true);
+  const [disastersError, setDisastersError] = useState<string | null>(null);
+  const [mapFocus, setMapFocus] = useState<{ lat: number; lng: number; label: string } | null>(null);
+
   const getApiEndpoint = (path: string) => {
     if (!apiHost) return path;
     return `${apiHost.replace(/\/$/, "")}${path}`;
   };
+
+  const fetchLiveDisasters = async () => {
+    setLoadingDisasters(true);
+    setDisastersError(null);
+    try {
+      const endpoint = getApiEndpoint("/api/live-disasters");
+      const res = await fetch(endpoint);
+      if (!res.ok) {
+        throw new Error(`Feed HTTP ${res.status}`);
+      }
+      const items: LiveDisaster[] = await res.json();
+      setDisasters(items);
+    } catch (err: unknown) {
+      console.error("Failed to fetch live disasters:", err);
+      setDisastersError(err instanceof Error ? err.message : "Failed to load live disaster feed");
+    } finally {
+      setLoadingDisasters(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveDisasters();
+  }, [apiHost]);
 
   const runInspection = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -187,6 +218,137 @@ export default function ControlRoom() {
     }
     return response.evidence_url || null;
   };
+
+  const renderMacroIntelWidget = () => (
+    <div className="bg-white border border-slate-300 shadow-sm rounded-lg p-4 flex flex-col">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-2.5 mb-3">
+        <div className="flex items-center gap-2">
+          <Globe size={18} className="text-blue-600" />
+          <h3 className="text-sm font-bold text-slate-900 tracking-wide uppercase">
+            Macro-Level Intel
+          </h3>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-bold">
+            CEMS & ReliefWeb
+          </span>
+          <button
+            type="button"
+            onClick={fetchLiveDisasters}
+            disabled={loadingDisasters}
+            title="Refresh feeds"
+            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+          >
+            <RefreshCw size={12} className={loadingDisasters ? "animate-spin text-blue-600" : ""} />
+          </button>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-slate-500 mb-2 leading-tight">
+        Global real-time satellite activations and UN humanitarian emergency reports.
+      </p>
+
+      {/* Scrollable Feed List */}
+      <div className="space-y-2 overflow-y-auto max-h-[360px] pr-1">
+        {loadingDisasters ? (
+          <div className="space-y-2 py-1">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="p-2.5 bg-slate-50 border border-slate-200 rounded-md animate-pulse">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="h-3.5 w-20 bg-slate-200 rounded"></div>
+                  <div className="h-3 w-14 bg-slate-200 rounded"></div>
+                </div>
+                <div className="h-3 w-4/5 bg-slate-200 rounded mb-1"></div>
+                <div className="h-2.5 w-1/2 bg-slate-100 rounded"></div>
+              </div>
+            ))}
+          </div>
+        ) : disastersError ? (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-xs flex items-center justify-between">
+            <span className="truncate">{disastersError}</span>
+            <button
+              type="button"
+              onClick={fetchLiveDisasters}
+              className="underline text-red-800 font-bold ml-2 shrink-0 cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        ) : disasters.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-4">No active global disaster alerts reported.</p>
+        ) : (
+          disasters.map((item) => {
+            const isReliefWeb = item.source.toLowerCase().includes("reliefweb");
+            return (
+              <div
+                key={item.id}
+                className="p-2.5 rounded-md border border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-white hover:shadow-xs transition-all group"
+              >
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span
+                    className={`text-[9px] font-mono uppercase font-bold px-1.5 py-0.5 rounded border ${
+                      isReliefWeb
+                        ? "bg-blue-100 text-blue-800 border-blue-300"
+                        : "bg-amber-100 text-amber-800 border-amber-300"
+                    }`}
+                  >
+                    {item.source}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate max-w-[100px] font-mono text-[9px] text-slate-500 font-semibold">
+                      {item.status}
+                    </span>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open official situation report"
+                      className="text-slate-400 hover:text-blue-600 transition-colors p-0.5"
+                    >
+                      <ExternalLink size={12} className="shrink-0" />
+                    </a>
+                  </div>
+                </div>
+
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-bold text-slate-900 group-hover:text-blue-700 transition-colors line-clamp-2 leading-snug hover:underline block"
+                >
+                  {item.title}
+                </a>
+
+                {item.lat != null && item.lng != null && (
+                  <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-500 border-t border-slate-100 pt-1.5">
+                    <div className="flex items-center gap-1">
+                      <MapPin size={11} className="text-amber-600 shrink-0" />
+                      <span>
+                        {item.lat.toFixed(2)}°, {item.lng.toFixed(2)}°
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMapFocus({
+                          lat: item.lat!,
+                          lng: item.lng!,
+                          label: `${item.source}: ${item.title}`
+                        })
+                      }
+                      className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-bold"
+                    >
+                      View on Map →
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 p-4 md:p-6 lg:p-8 font-sans selection:bg-blue-600/20">
@@ -621,42 +783,67 @@ export default function ControlRoom() {
           </div>
 
           {/* -----------------------------------------------------------------------
-              RIGHT: GEOSPATIAL MAP INTEGRATION (1 Col)
+              RIGHT: GEOSPATIAL MAP & MACRO-LEVEL INTEL (1 Col)
           ----------------------------------------------------------------------- */}
-          <div className="lg:col-span-1 bg-white border border-slate-300 shadow-sm rounded-lg p-4 flex flex-col">
-            <h2 className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2">
-              <MapPin size={18} className="text-blue-600" /> GIS Coordinates
-            </h2>
-            <div className="flex justify-between items-center mb-3 bg-slate-100 p-2.5 rounded-md border border-slate-200">
-              <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-700">
-                <Compass size={16} className="text-blue-600" />
-                <span>
-                  {data.gps ? `${data.gps.lat.toFixed(4)}° N, ${Math.abs(data.gps.lng).toFixed(4)}° W` : "29.7604° N, 95.3698° W"}
-                </span>
+          <div className="lg:col-span-1 flex flex-col gap-4">
+            <div className="bg-white border border-slate-300 shadow-sm rounded-lg p-4 flex flex-col">
+              <h2 className="text-base font-bold text-slate-800 mb-3 flex items-center gap-2">
+                <MapPin size={18} className="text-blue-600" /> GIS Coordinates
+              </h2>
+              <div className="flex justify-between items-center mb-3 bg-slate-100 p-2.5 rounded-md border border-slate-200">
+                <div className="flex items-center gap-2 text-xs font-mono font-bold text-slate-700 truncate">
+                  <Compass size={16} className="text-blue-600 shrink-0" />
+                  <span className="truncate">
+                    {mapFocus
+                      ? `${mapFocus.lat.toFixed(4)}° N, ${Math.abs(mapFocus.lng).toFixed(4)}° W`
+                      : data.gps
+                      ? `${data.gps.lat.toFixed(4)}° N, ${Math.abs(data.gps.lng).toFixed(4)}° W`
+                      : "29.7604° N, 95.3698° W"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {mapFocus && (
+                    <button
+                      type="button"
+                      onClick={() => setMapFocus(null)}
+                      className="text-[10px] text-slate-500 underline hover:text-slate-800 cursor-pointer font-mono"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 font-bold">
+                    {mapFocus ? "ALERT" : "SAT-GPS"}
+                  </span>
+                </div>
               </div>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200 font-bold">
-                SAT-GPS
-              </span>
+              <div className="min-h-[260px] rounded-md overflow-hidden border border-slate-300">
+                <GISMap
+                  lat={mapFocus?.lat ?? data.gps?.lat ?? 29.7604}
+                  lng={mapFocus?.lng ?? data.gps?.lng ?? -95.3698}
+                  hazard={mapFocus?.label ?? data.trace[0]?.llm.observed_hazard ?? "Submerged vehicle hazard"}
+                />
+              </div>
             </div>
-            <div className="flex-1 min-h-[300px] rounded-md overflow-hidden border border-slate-300">
-              <GISMap
-                lat={data.gps?.lat || 29.7604}
-                lng={data.gps?.lng || -95.3698}
-                hazard={data.trace[0]?.llm.observed_hazard || "Submerged vehicle hazard"}
-              />
-            </div>
+
+            {/* Macro-Level Intel (CEMS & ReliefWeb) */}
+            {renderMacroIntelWidget()}
           </div>
         </div>
       ) : (
-        /* Empty State */
-        <div className="py-24 flex flex-col items-center justify-center gap-3 text-center border-2 border-dashed border-slate-300 rounded-xl bg-white shadow-xs">
-          <Crosshair className="w-12 h-12 text-blue-600/70 animate-pulse" />
-          <h3 className="text-base font-bold text-slate-800">
-            Awaiting Aerial Feed Ingestion
-          </h3>
-          <p className="text-xs text-slate-600 max-w-lg leading-relaxed font-medium">
-            Select one of the FloodNet SAR scenarios above or upload an aerial drone keyframe to initiate automated computer vision triage and geospatial positioning.
-          </p>
+        /* Empty State with Macro-Level Intel */
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 py-20 flex flex-col items-center justify-center gap-3 text-center border-2 border-dashed border-slate-300 rounded-xl bg-white shadow-xs px-6">
+            <Crosshair className="w-12 h-12 text-blue-600/70 animate-pulse" />
+            <h3 className="text-base font-bold text-slate-800">
+              Awaiting Aerial Feed Ingestion
+            </h3>
+            <p className="text-xs text-slate-600 max-w-lg leading-relaxed font-medium">
+              Select one of the FloodNet SAR scenarios above or upload an aerial drone keyframe to initiate automated computer vision triage and geospatial positioning.
+            </p>
+          </div>
+          <div className="lg:col-span-1">
+            {renderMacroIntelWidget()}
+          </div>
         </div>
       )}
     </div>

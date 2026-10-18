@@ -46,3 +46,12 @@ export interface InspectionResponse {
   visual_evidence?: VisualEvidence;
   gps?: { lat: number; lng: number };
 }
+export interface LiveDisaster {
+  id: string;
+  title: string;
+  source: string;
+  status: string;
+  url: string;
+  lat?: number | null;
+  lng?: number | null;
+}
